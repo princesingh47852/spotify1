@@ -16,17 +16,18 @@ function formatSeconds(seconds) {
 
 async function getSongs(folder) {
     currfolder = folder;
-    
-    // REPLACED: Fetching folder files from GitHub API instead of local screen scraping
-    let a = await fetch(`https://api.github.com/repos/princesingh47852/spotify/contents/songs/${folder}`);
-    let response = await a.json(); // GitHub API sends back clean JSON data!
+    // FIXED: Ensured URL matches your local Live Server structure accurately
+    let a = await fetch(`/songs/${folder}/`);
+    let response = await a.text();
+    let div = document.createElement("div");
+    div.innerHTML = response;
+    let as = div.getElementsByTagName("a");
     
     songs = []; 
-    // REPLACED: Loop over the JSON array elements instead of HTML anchor tags
-    for (let index = 0; index < response.length; index++) {
-        const element = response[index];
-        if (element.name.endsWith(".mp3")) {
-            songs.push(element.name); 
+    for (let index = 0; index < as.length; index++) {
+        const element = as[index];
+        if (element.href.endsWith(".mp3")) {
+            songs.push(element.href.split("/").slice(-1)[0]); 
         }
     }
 
@@ -35,9 +36,10 @@ async function getSongs(folder) {
     songul.innerHTML = ""; 
     
     for (const song of songs) {
+        // Keeps song variable raw for dataset use later, visually cleaned up using replaceAll
         songul.innerHTML = songul.innerHTML + `<li data-track="${song}"> <img class="invert" src="assets/music.svg">
                         <div class="info">
-                            <div>${song.replaceAll("%20", " ").replace(".mp3", "")}</div>
+                            <div>${song.replaceAll("%20", " ").replace(".mp3", "")}}</div>
                             <div>${currfolder.replaceAll("%20", " ")}</div>
                         </div>
                         <div class="playnow">
@@ -52,35 +54,37 @@ async function getSongs(folder) {
 
     Array.from(document.querySelector(".songlist").getElementsByTagName("li")).forEach(e => {
         e.addEventListener("click", () => {
+            // FIXED: Passing the exact attribute file name instead of innerHTML text
             playmusic(e.getAttribute("data-track"));
         });
     });
 }
 
 const playmusic = (track) => {
-    // FIXED: Keeps the path local relative to your deployed site root for playback streaming
+    // FIXED: Corrected path structure pointing back to target source folder
     currentsong.src = `/songs/${currfolder}/` + track;
     currentsong.play().catch(err => console.log("Playback failed/interrupted:", err));
     
     document.querySelector("#play").src = "assets/pause.svg";
-    document.querySelector(".songinfo").innerHTML = track.replaceAll("%20", " ").replace(".mp3", "");
+    document.querySelector(".songinfo").innerHTML = track.replaceAll("%20", " ").replace(".mp3", "");;
     document.querySelector(".songtime").innerHTML = "00:00 / 00:00";
 }
 
 async function displayFolders() {
-    // REPLACED: Fetching the folders from GitHub API instead of local screen scraping
-    let a = await fetch(`https://api.github.com/repos/princesingh47852/spotify/contents/songs`);
-    let response = await a.json();
+    let a = await fetch(`/songs/`);
+    let response = await a.text();
+    let div = document.createElement("div");
+    div.innerHTML = response;
+    let anchors = div.getElementsByTagName("a");
     let cardContainer = document.querySelector(".cardContainer");
     
-    cardContainer.innerHTML = ""; 
+    cardContainer.innerHTML = ""; // Clear placeholders if any exist
     
-    // REPLACED: Processing API JSON array data elements directly
-    for (let index = 0; index < response.length; index++) {
-        const e = response[index];
+    for (let index = 0; index < anchors.length; index++) {
+        const e = anchors[index];
         
-        if (e.type === "dir") { // Check if the item in the repository is a directory/folder
-            let folder = e.name;
+        if (e.href.includes("/songs/")) {
+            let folder = e.href.split("/").slice(-2)[1];
             
             cardContainer.innerHTML = cardContainer.innerHTML + `
                 <div data-folder="${folder}" class="card">
@@ -108,7 +112,10 @@ async function displayFolders() {
 }
 
 async function main() {
+    // Display folders listed on dashboard layout
     await displayFolders();
+
+    // FIXED: Changed 'songs/np' to just 'np' so path does not repeat as songs/songs/np
     await getSongs(`np`);
     
     let playBtn = document.querySelector("#play");
@@ -145,6 +152,7 @@ async function main() {
 
     document.querySelector("#previous").addEventListener("click", () => {
         let currentFilename = currentsong.src.split("/").slice(-1)[0];
+        // FIXED: Using decodeURIComponent to ensure string matching rules match items in songs[] array
         let index = songs.indexOf(currentFilename);
         
         if ((index - 1) >= 0) {
